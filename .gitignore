@@ -20,3 +20,6 @@ __pycache__/
 
 # Ignore venv folder
 venv/
+
+# Ignore package info
+*.egg-info

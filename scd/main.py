@@ -3,9 +3,9 @@ import torch
 from pathlib import Path
 import scipy.io as sio
 
-from config.structures import set_random_seed, Config
-from models.scd import SwarmContrastiveDecomposition
-from processing.postprocess import save_results
+from scd.config.structures import set_random_seed, Config
+from scd.models.scd import SwarmContrastiveDecomposition
+from scd.processing.postprocess import save_results
 
 set_random_seed(seed=42)
 
