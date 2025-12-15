@@ -29,18 +29,22 @@ Follow these steps to set up the project locally:
     ```sh
     git clone https://github.com/AgneGris/swarm-contrastive-decomposition
     ```
-2. Navigate to the project directory:
+2. In your local project folder install the package:
     ```sh
-    cd swarm-contrastive-decomposition
+    pip install swarm-contrastive-decomposition
     ```
-3. Create the conda environment from the `decomposition.yml` file:
+    or 
     ```sh
-    conda env create -f decomposition.yml
+    pip install -e swarm-contrastive-decomposition
     ```
-4. Activate the environment:
-    ```sh
-    conda activate decomposition
-    ```
+    if you intend to modify the original code.
+   
+Alternatively, the module can be installed directly into your environment doing:
+```sh
+pip install https://github.com/AgneGris/swarm-contrastive-decomposition.git
+```
+
+Regardless of the installation approach, once completed all module functions are available under `scd.[submodule_name]`
 
 ## How to use this repository 🚀
 1. **Upload Your Input Data:**
