@@ -333,13 +333,47 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
             "silhouettes": [],
             "timestamps": [],
             "source": [],
+            "source_type": [],
             "RoA": [],
             "filters": [],
             "fr": [],
             "cov": [],
             "best_exp": [],
-            "source": [],
         }
+
+    def populate_dictionary(self, library, source_type):
+        timestamp_list = [self.data.global_best["timestamps"]]
+
+        for timestamps in timestamp_list:
+            library.append(timestamps)
+
+        if self.config.output_final_source_plot:
+            plot_accepted_source(self.data.global_best["source"], timestamps)
+
+        self.decomp["silhouettes"].append(self.data.global_best["silhouette"])
+        self.decomp["timestamps"].append(timestamps)
+        self.decomp["fr"].append(
+            calculate_firing_rates(
+                timestamps,
+                window_size_in_seconds=1,
+                fsamp2=self.config.sampling_frequency,
+            )
+        )
+        self.decomp["cov"].append(bootstrapped_coeff_var(timestamps))
+        self.decomp["best_exp"].append(
+            self.exponents_list[-1][self.best_exp_idx_list[-1].item()]
+        )
+        self.decomp["filters"].append(
+            self.data.ica_weights.detach()
+            .cpu()
+            .numpy()
+            .copy()[:, [self.best_exp_idx_list[-1].item()]]
+        )
+        self.decomp["source"].append(
+            self.data.global_best["source"].detach().cpu().numpy().copy()
+        )
+        self.decomp["source_type"].append(source_type)
+
 
     def run(
         self,
@@ -410,47 +444,28 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
 
             if source_type == "good":
                 patience = 0
-                message = str(iteration) + ": accept new source."
+                message = str(iteration) + f": accept new source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f}, exponent={self.decomp['best_exp'][-1]:.2f})."
+
                 peel = True
 
-                timestamp_list = [self.data.global_best["timestamps"]]
-
-                for timestamps in timestamp_list:
-                    library.append(timestamps)
-
-                if self.config.output_final_source_plot:
-                    plot_accepted_source(self.data.global_best["source"], timestamps)
-
-                self.decomp["silhouettes"].append(self.data.global_best["silhouette"])
-                self.decomp["timestamps"].append(timestamps)
-                self.decomp["fr"].append(
-                    calculate_firing_rates(
-                        timestamps,
-                        window_size_in_seconds=1,
-                        fsamp2=self.config.sampling_frequency,
-                    )
-                )
-                self.decomp["cov"].append(bootstrapped_coeff_var(timestamps))
-                self.decomp["best_exp"].append(
-                    self.exponents_list[-1][self.best_exp_idx_list[-1].item()]
-                )
-                self.decomp["filters"].append(
-                    self.data.ica_weights.detach()
-                    .cpu()
-                    .numpy()
-                    .copy()[:, [self.best_exp_idx_list[-1].item()]]
-                )
-                self.decomp["source"].append(
-                    self.data.global_best["source"].detach().cpu().numpy().copy()
-                )
+                # Append variables
+                self.populate_dictionary(library, source_type)
 
             elif source_type == "repeat":
                 patience += 1
                 message = str(iteration) + ": reject repeat source."
                 peel = True if self.config.peel_off_repeats else False
+
+                if peel:
+                    # Append variables
+                    self.populate_dictionary(library, source_type)
+
             elif source_type == "bad":
                 patience += 1
-                message = str(iteration) + ": reject low silhouette source."
+                try:
+                    message = str(iteration) + f": reject low fitness source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f})."
+                except:
+                    message = str(iteration) + f": reject low fitness source"
                 peel = False
 
             if peel:
