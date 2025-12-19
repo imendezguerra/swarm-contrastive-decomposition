@@ -120,9 +120,9 @@ class Data:
         self.swarm_velocities = None
         self.ica_optimiser = None
 
-        self.init_all()
+        self._init_all()
 
-    def init_all(self):
+    def _init_all(self):
         """Initialise all variables except the EMG data"""
 
         self.init_swarm()
