@@ -81,7 +81,8 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
         emg = extend(emg, self.config.extension_factor)
 
         # Finally decorrelate the extended emg
-        emg = whiten(emg, self.config.whitening_method)
+        emg, whitening = whiten(emg, self.config.whitening_method, return_whitening=True)
+        self.decomp["whitening"] = whitening
 
         if self.config.autocorrelation_whiten:
             emg = autocorrelation_whiten(
@@ -229,7 +230,7 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
                         min_peak_separation,
                     )
                     if s.isfinite().all()
-                    else [torch.tensor(0).type_as(s)] * 2
+                    else [torch.tensor(0).type_as(s)] * 3
                 )
                 for s in sources.t()
             ]
@@ -279,12 +280,17 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
 
         # Convert fitness to tensor
         fitness = torch.stack(fitness)
-
+        
+        # Find the best fitness and index
+        max_fitness = fitness.max()
+        best_idx = fitness.argmax()
+                
         # Save the source if new global best of fitness
-        if fitness.max() > self.data.global_best["fitness"]:
-            self.data.global_best["source"] = sources[:, [fitness.argmax()]]
-            self.data.global_best["timestamps"] = timestamps[fitness.argmax()]
-            self.data.global_best["silhouette"] = silhouettes[fitness.argmax()]
+        if max_fitness > self.data.global_best["fitness"]:
+            self.data.global_best["source"] = sources[:, [best_idx]]
+            self.data.global_best["timestamps"] = timestamps[best_idx]
+            self.data.global_best["silhouette"] = silhouettes[best_idx]
+            self.data.global_best["fitness"] = max_fitness
 
         # Use the fitness to update the swarm particles (the exponents)
         self.swarm_step(fitness)
@@ -335,6 +341,8 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
             "source": [],
             "source_type": [],
             "RoA": [],
+            "whitening": None,
+            "fitness": [],
             "filters": [],
             "fr": [],
             "cov": [],
@@ -350,8 +358,9 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
         if self.config.output_final_source_plot:
             plot_accepted_source(self.data.global_best["source"], timestamps)
 
-        self.decomp["silhouettes"].append(self.data.global_best["silhouette"])
-        self.decomp["timestamps"].append(timestamps)
+        self.decomp["fitness"].append(self.data.global_best["fitness"].detach().cpu().numpy().copy())
+        self.decomp["silhouettes"].append(self.data.global_best["silhouette"].detach().cpu().numpy().copy())
+        self.decomp["timestamps"].append(timestamps.detach().cpu().numpy().copy())
         self.decomp["fr"].append(
             calculate_firing_rates(
                 timestamps,
@@ -359,10 +368,16 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
                 fsamp2=self.config.sampling_frequency,
             )
         )
-        self.decomp["cov"].append(bootstrapped_coeff_var(timestamps))
-        self.decomp["best_exp"].append(
-            self.exponents_list[-1][self.best_exp_idx_list[-1].item()]
-        )
+        self.decomp["cov"].append(bootstrapped_coeff_var(timestamps).detach().cpu().numpy().copy())
+
+        if len(self.exponents_list) > 1:
+            self.decomp["best_exp"].append(
+                self.exponents_list[-1][self.best_exp_idx_list[-1].item()]
+            )
+        else:
+            self.decomp["best_exp"].append(
+                self.data.exponents.item()
+            )
         self.decomp["filters"].append(
             self.data.ica_weights.detach()
             .cpu()
@@ -381,13 +396,14 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
         config: Optional[Config] = None,
     ) -> Tuple[List[torch.Tensor], Dict]:
         """Sets optimiser and runs"""
-
+        
+        # Initialise output dictionary
         self.initialise_dictionary()
 
         # Initialise dataclasses, preprocessing the emg prior to assignment
         self.config = config if config is not None else Config()
         self.data = Data(
-            emg=self.preprocess_emg(emg),
+            emg=self.preprocess_emg(emg), # Whitening saved during preprocessing
             starting_exponents=self.config.starting_exponents,
             ica_learning_rate=self.config.ica_learning_rate,
             ica_momentum=self.config.ica_momentum,
@@ -444,28 +460,29 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
 
             if source_type == "good":
                 patience = 0
-                message = str(iteration) + f": accept new source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f}, exponent={self.decomp['best_exp'][-1]:.2f})."
-
                 peel = True
 
                 # Append variables
                 self.populate_dictionary(library, source_type)
+                message = str(iteration) + f": ACCEPT new source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f}, exponent={self.decomp['best_exp'][-1]:.2f})."
 
             elif source_type == "repeat":
                 patience += 1
-                message = str(iteration) + ": reject repeat source."
                 peel = True if self.config.peel_off_repeats else False
 
                 if peel:
                     # Append variables
                     self.populate_dictionary(library, source_type)
+                    message = str(iteration) + f": REJECT repeat source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f}, exponent={self.decomp['best_exp'][-1]:.2f})."
+                else:
+                    message = str(iteration) + ": REJECT repeat source."
 
             elif source_type == "bad":
                 patience += 1
                 try:
-                    message = str(iteration) + f": reject low fitness source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f})."
+                    message = str(iteration) + f": REJECT low fitness source (SIL={self.data.global_best['silhouette']:.4f}, fitness={self.data.global_best['fitness']:.4f}, fr={fr:.2f})."
                 except:
-                    message = str(iteration) + f": reject low fitness source"
+                    message = str(iteration) + f": REJECT low fitness source"
                 peel = False
 
             if peel:

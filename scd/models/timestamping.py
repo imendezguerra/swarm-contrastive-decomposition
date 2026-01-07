@@ -156,7 +156,7 @@ def source_to_timestamps(
 
         # Check if centroids are empty
         if centroids.numel() == 0 or torch.isnan(centroids).any():
-            return torch.tensor([]).type_as(heights), torch.tensor(0.0).type_as(heights)
+            return torch.tensor([]).type_as(heights), torch.tensor(0.0).type_as(heights), torch.tensor(0.0).type_as(heights)
 
         # Part 3: Calculate silhouette score relative to centroids or pairwise
         silhouette = (
