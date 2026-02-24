@@ -98,7 +98,10 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
     def calculate_sources(self) -> torch.Tensor:
         """Apply separation vectors to emg to get sources"""
 
-        sources = torch.matmul(self.data.emg, self.data.ica_weights)
+        if self.config.square_sources:
+            sources = torch.matmul(self.data.emg, self.data.ica_weights) ** 2
+        else:
+            sources = torch.matmul(self.data.emg, self.data.ica_weights)
         sources = (sources - sources.mean(0)) / sources.std(0)
 
         # Clamp sources to avoid outlying spikes

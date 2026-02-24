@@ -56,6 +56,7 @@ class Config:
     ica_patience: int = 10
     ica_learning_rate: float = 0.001
     ica_momentum: float = 0.9
+    square_sources: bool = False
     edge_mask_size: int = 200
 
     # Swarm parameters
