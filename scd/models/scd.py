@@ -403,8 +403,13 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
         # Initialise output dictionary
         self.initialise_dictionary()
 
-        # Initialise dataclasses, preprocessing the emg prior to assignment
+        # Initialise config
         self.config = config if config is not None else Config()
+        # Send data to config.device if not in device
+        if emg.device.type != self.config.device:
+            emg=emg.to(self.config.device)
+            print(f'EMG data sent to {emg.device.type} by config.device={config.device}')
+        # Initialise dataclasses, preprocessing the emg prior to assignment
         self.data = Data(
             emg=self.preprocess_emg(emg), # Whitening saved during preprocessing
             starting_exponents=self.config.starting_exponents,
