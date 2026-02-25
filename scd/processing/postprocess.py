@@ -20,3 +20,17 @@ def save_results(output_datafile, dictionary_result):
             pkl.dump(dictionary_result, f)
     except Exception as e:
         print(f"Error occurred while saving results: {e}")
+
+def load_results(input_datafile):
+    """
+    Load the dictionary_result from the input_datafile.
+
+    Args:
+        input_datafile (str): The path to the input data file.
+    Returns:
+        dict: The loaded dictionary.    
+    """
+
+    with open(input_datafile, "rb") as f:
+        dictionary_result = pkl.load(f)
+    return dictionary_result
