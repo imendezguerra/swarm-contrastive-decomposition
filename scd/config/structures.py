@@ -50,7 +50,8 @@ class Config:
     peel_off_repeats: bool = True
     remove_bad_fr: bool = True
     clamp_percentile: Optional[float] = 0.999
-
+    clamp_above: int = 30
+    
     # ICA parameters
     max_ica_steps: int = 1000
     ica_patience: int = 10

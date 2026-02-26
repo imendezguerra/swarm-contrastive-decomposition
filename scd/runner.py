@@ -49,8 +49,8 @@ def run_scd_sim(
         device='cuda',
         ica_patience=100,
         output_source_plot=False,
-        output_final_source_plot=False
-        )
+        output_final_source_plot=False,
+    )
 
     # Select data
     if config.end_time == -1:

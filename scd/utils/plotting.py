@@ -31,9 +31,10 @@ def plot_sources(
     ), "time must be longer than source in sources input, is it transposed?"
 
     # Convert inputs to something plt can understand
-    sources = sources.detach().cpu().numpy()
+    sources = sources.detach().cpu().numpy() ** 2 
     if timestamps is not None:
-        timestamps = [t.detach().cpu().numpy() for t in timestamps]
+        # Ensure timestamps are valid integer indices for numpy indexing
+        timestamps = [t.detach().cpu().numpy().astype(np.int64) for t in timestamps]
     if exponents is not None:
         exponents = exponents.detach().cpu().numpy()
     if fitness is not None:

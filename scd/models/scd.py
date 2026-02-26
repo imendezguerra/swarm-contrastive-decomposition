@@ -98,17 +98,14 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
     def calculate_sources(self) -> torch.Tensor:
         """Apply separation vectors to emg to get sources"""
 
-        if self.config.square_sources:
-            sources = torch.matmul(self.data.emg, self.data.ica_weights) ** 2
-        else:
-            sources = torch.matmul(self.data.emg, self.data.ica_weights)
+        sources = torch.matmul(self.data.emg, self.data.ica_weights)
         sources = (sources - sources.mean(0)) / sources.std(0)
 
         # Clamp sources to avoid outlying spikes
         if self.config.clamp_percentile:
 
             if torch.all(self.data.personal_best['spike_heights'] == 0):
-                sources = sources.clamp(max=30)
+                sources = sources.clamp(max=self.config.clamp_above)
             else:
                 for s in range(sources.shape[1]):
                     if self.data.personal_best['spike_outliers'][s]:
@@ -119,10 +116,10 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
                             std = 0.5
                         sources[sources[:,s] > thr, s] = mu + torch.randn_like(sources[sources[:,s] > thr, s]) * std
                     else:
-                        sources[sources[:,s] > 30, s] = 30
+                        sources[sources[:,s] > self.config.clamp_above, s] = self.config.clamp_above
             
         else:
-            sources = sources.clamp(max=30)
+            sources = sources.clamp(max=self.config.clamp_above)
 
         return sources
 
@@ -225,6 +222,9 @@ class SwarmContrastiveDecomposition(torch.nn.Module):
         and aggregate. Calculates a fitness function for the swarm."""
 
         # Calculate timestamps from k means with associated silhouettes
+        if self.config.square_sources:
+            sources = sources ** 2
+
         timestamps, spike_heights, silhouettes = zip(
             *[
                 (
